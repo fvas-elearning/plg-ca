@@ -103,13 +103,13 @@ class EntryMap extends Mapper
             if ($w) $filter->appendWhere('(%s) AND ', substr($w, 0, -3));
         }
 
-
         if (!empty($filter['id'])) {
             $w = $this->makeMultiQuery($filter['id'], 'a.id');
             if ($w) $filter->appendWhere('(%s) AND ', $w);
         }
         if (!empty($filter['assessmentId'])) {
-            $filter->appendWhere('a.assessment_id = %s AND ', (int)$filter['assessmentId']);
+            $w = $this->makeMultiQuery($filter['assessmentId'], 'a.assessment_id');
+            if ($w) $filter->appendWhere('(%s) AND ', $w);
         }
         if (!empty($filter['subjectId'])) {
             $filter->appendWhere('a.subject_id = %s AND ', (int)$filter['subjectId']);
@@ -240,14 +240,23 @@ class EntryMap extends Mapper
      *
      * @param Assessment $assessment
      * @param \Uni\Db\SubjectIface $subject
+     * @param \DateTime|null $now
      * @return false|\PDOStatement|\Tk\Db\PDOStatement
      * @throws \Tk\Db\Exception
      */
-    public function findReminders(Assessment $assessment, \Uni\Db\SubjectIface $subject)
+    public function findReminders(Assessment $assessment, \Uni\Db\SubjectIface $subject, ?\DateTime $now = null)
     {
+        if (!$now)
+            $now = \Tk\Date::create();
+        $now = $now->format(\Tk\Date::FORMAT_ISO_DATETIME);
+
         $placementTypeIds = $assessment->getPlacementTypes()->toArray('id');
         $placementTypeIdSql = \Tk\Db\Mapper::makeMultipleQuery($placementTypeIds, 'a2.placement_type_id');
+        if ($placementTypeIdSql)
+            $placementTypeIdSql = 'AND (' . $placementTypeIdSql . ')';
         $statusSql = \Tk\Db\Mapper::makeMultipleQuery($assessment->getPlacementStatus(), 'a2.status');
+        if ($statusSql)
+            $statusSql = 'AND (' . $statusSql . ')';
         $maxReminder = $assessment->getReminderRepeatCycles()+1;
 
         $sql = sprintf("SELECT *
@@ -256,29 +265,28 @@ FROM (
         FROM placement a1
         LEFT JOIN ca_entry ce ON (a1.id = ce.placement_id AND ce.assessment_id = %s)
         WHERE
-    --      (a1.placement_type_id = '9')
-    --      AND a1.subject_id = 57
-    --      AND (a1.status = 'assessing' OR a1.status = 'completed' OR a1.status = 'evaluating' OR a1.status = 'failed')
           ce.id IS NULL
           AND DATE(a1.date_start) > '2020-01-01' -- So older placements are not included
-          AND DATE(DATE_ADD(a1.date_end, INTERVAL 7 DAY)) <= DATE(NOW())
+          AND DATE(DATE_ADD(a1.date_end, INTERVAL 7 DAY)) <= DATE(%s)
         ORDER BY a1.date_end DESC
     ) a,
     (
          SELECT a2.id as 'placement_id', %s as 'assessment_id', IFNULL(COUNT(b2.date), 0) as 'reminder_count', MAX(b2.date) as 'last_sent'
          FROM placement a2 LEFT JOIN ca_reminder b2 ON (a2.id = b2.placement_id AND b2.assessment_id = %s)
-         WHERE 
-           (%s) AND 
-           a2.subject_id = %s AND
-           (%s)
+         WHERE
+           a2.subject_id = %s
+           %s
+           %s
          GROUP BY a2.id
     ) b
---    , subject e, ca_assessment f
-WHERE a.id = b.placement_id
+WHERE a.id = b.placement_id 
       AND b.reminder_count <= %s
---       AND a.subject_id = e.id AND e.course_id = f.course_id AND f.id = %s
 ORDER BY a.date_end DESC
-", $assessment->getId(), $assessment->getId(), $assessment->getId(), $placementTypeIdSql, $subject->getId(), $statusSql, $maxReminder, $assessment->getId());
+",
+            $assessment->getId(), $this->quote($now), $assessment->getId(), $assessment->getId(),
+            $subject->getId(), $placementTypeIdSql, $statusSql,
+            $maxReminder
+        );
 
         return $this->getConfig()->getDb()->query($sql);
     }
@@ -286,13 +294,17 @@ ORDER BY a.date_end DESC
     /**
      * @param int $assessmentId
      * @param int $placementId
+     * @param \DateTime|null $now
      * @return bool
-     * @throws \Exception
+     * @throws \Tk\Db\Exception
      */
-    public function addReminderLog($assessmentId, $placementId)
+    public function addReminderLog($assessmentId, $placementId, ?\DateTime $now = null)
     {
-        $stmt = $this->getDb()->prepare('INSERT INTO ca_reminder (assessment_id, placement_id, date) VALUES (?, ?, NOW())');
-        return $stmt->execute(array($assessmentId, $placementId));
+        if (!$now)
+            $now = \Tk\Date::create();
+        $now = $now->format(\Tk\Date::FORMAT_ISO_DATETIME);
+        $stmt = $this->getDb()->prepare('INSERT INTO ca_reminder (assessment_id, placement_id, date) VALUES (?, ?, ?)');
+        return $stmt->execute(array($assessmentId, $placementId, $now));
     }
 
     /**

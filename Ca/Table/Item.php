@@ -103,7 +103,7 @@ class Item extends \Uni\TableIface
         // Actions
         //$this->appendAction(\Tk\Table\Action\Link::createLink('New Item', \Bs\Uri::createHomeUrl('/ca/itemEdit.html'), 'fa fa-plus'));
         //$this->appendAction(\Tk\Table\Action\ColumnSelect::create()->setUnselected(array('modified', 'created')));
-        if ($this->getAuthUser()->hasPermission(\Uni\Db\Permission::TYPE_COORDINATOR)) {
+        if ($this->getAuthUser()->isCoordinator()) {
             $this->appendAction(\Tk\Table\Action\Delete::create());
         }
         $this->appendAction(\Tk\Table\Action\Csv::create());

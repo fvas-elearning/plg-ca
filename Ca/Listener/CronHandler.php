@@ -61,7 +61,8 @@ class CronHandler implements Subscriber
         // Get enabled courses
         $plugin = \Ca\Plugin::getInstance();
         $courseList = $plugin->getPluginFactory()->getPluginZoneIdList($plugin->getName(), \App\Plugin\Iface::ZONE_COURSE);
-        $now = \Tk\Date::floor();
+        $now = $console->getNow();
+
         //$courseList = array_reverse($courseList);
         foreach ($courseList as $courseData) {
             /** @var \Uni\Db\CourseIface $course */
@@ -94,8 +95,8 @@ class CronHandler implements Subscriber
                 $subjectFound = false;
                 foreach ($assessmentList as $i => $assessment) {
                     if (!$assessment->isEnableReminder() || !$assessment->isActive($subject->getId())) continue;
-                    // Get a list of placements with no assessments
-                    $res = \Ca\Db\EntryMap::create()->findReminders($assessment, $subject);
+                    // Get a list of placements with no assessments, only for assessing or evaluating status of placements
+                    $res = \Ca\Db\EntryMap::create()->findReminders($assessment, $subject, $now);
                     if (!$res->rowCount()) continue;
 
                     if (!$subjectFound && $res->rowCount()) {
@@ -103,11 +104,12 @@ class CronHandler implements Subscriber
                         $subjectFound = true;
                     }
 
-                    $date =  new \DateTime('today -'.$assessment->getReminderInitialDays().' days');
+                    //$date =  new \DateTime('today -'.$assessment->getReminderInitialDays().' days');
+                    $date = clone $now;
+                    $date = $date->add(new \DateInterval('P'.$assessment->getReminderInitialDays().'D'));
+
                     $console->writeComment('       Assessment: ' . $assessment->getName() . ' - ' . $assessment->getPlacementTypeName() . ' [' . $assessment->getId() . ']');
                     $console->writeComment('        Date From: ' . $date->format(\Tk\Date::FORMAT_SHORT_DATE));
-
-
                     $console->writeComment('        Empty Entries: ' . $res->rowCount());
                     $sentCnt = 0;;
                     foreach($res as $row) {
@@ -115,11 +117,13 @@ class CronHandler implements Subscriber
                         $placement = \App\Db\PlacementMap::create()->find($row->id);
                         if (!$placement) continue;
 
-                        // Calculate the next due reminder date for this placememt/Assessment
-                        $nextReminderDate = \Tk\Date::floor($placement->getDateEnd()->add(new \DateInterval('P'.$assessment->getReminderInitialDays().'D')));
+                        // Calculate the next due reminder date for this placememnt/Assessment
+                        $nextReminderDate = \Tk\Date::floor($placement->getDateEnd()
+                            ->add(new \DateInterval('P'.$assessment->getReminderInitialDays().'D')));
                         if ($row->last_sent) {
                             $lastSent = \Tk\Date::floor(\Tk\Date::create($row->last_sent));
-                            $nextReminderDate = \Tk\Date::floor($lastSent->add(new \DateInterval('P' . $assessment->getReminderRepeatDays() . 'D')));
+                            $nextReminderDate = \Tk\Date::floor($lastSent
+                                ->add(new \DateInterval('P' . $assessment->getReminderRepeatDays() . 'D')));
                         }
 
                         // compare dates, last date and number of reminders sent to see what should be sent and what should not.
@@ -127,18 +131,20 @@ class CronHandler implements Subscriber
                             $entry = \Ca\Db\Entry::create($placement, $assessment);      // Do not save() this status and entry..
                             $entry->setStatus('reminder');
 
-                            $status = \Uni\Db\Status::create($entry, 'Assessment Reminder');
+                            $status = $this->getConfig()->createStatus($entry);
+                            $status->setName('Assessment Reminder');
                             $status->setEvent('message.ca.entry.reminder');
 
-                            $e = new \Uni\Event\StatusEvent($status);
-                            $this->getConfig()->getEventDispatcher()->dispatch(\Uni\StatusEvents::STATUS_CHANGE, $e);
-                            $this->getConfig()->getEventDispatcher()->dispatch(\Uni\StatusEvents::STATUS_SEND_MESSAGES, $e);
+                            $e = new \Bs\Event\StatusEvent($status);
+                            $this->getConfig()->getEventDispatcher()->dispatch(\Bs\StatusEvents::STATUS_CHANGE, $e);
+                            $this->getConfig()->getEventDispatcher()->dispatch(\Bs\StatusEvents::STATUS_SEND_MESSAGES, $e);
+                        //\Tk\Log::warning($placement->getTitle() . ': ' . $placement->getStatus());
                             if ($e->isPropagationStopped()) continue;
 
                             // Mark reminder sent
                             $sentCnt += $e->get('sent', 0);
                             if ($e->get('sent', 0)) {
-                                \Ca\Db\EntryMap::create()->addReminderLog($assessment->getId(), $placement->getId());
+                                \Ca\Db\EntryMap::create()->addReminderLog($assessment->getId(), $placement->getId(), $now);
                             }
                         }
                     }

@@ -4,7 +4,7 @@
 
 
 -- ----------------------------
--- Asessment
+-- Assessment
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS ca_assessment (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

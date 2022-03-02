@@ -1,6 +1,7 @@
 <?php
 namespace Ca\Listener;
 
+use Tk\ConfigTrait;
 use Tk\Event\Subscriber;
 
 /**
@@ -10,9 +11,10 @@ use Tk\Event\Subscriber;
  */
 class PlacementViewHandler implements Subscriber
 {
+    use ConfigTrait;
 
     /**
-     * @var \App\Controller\Student\Placement\View
+     * @var \App\Controller\Placement\View
      */
     private $controller = null;
 
@@ -23,21 +25,22 @@ class PlacementViewHandler implements Subscriber
      */
     public function onControllerInit(\Tk\Event\Event $event)
     {
-        /** @var \App\Controller\Student\Placement\View $controller */
+        /** @var \App\Controller\Placement\View $controller */
         $controller = $event->get('controller');
-        if ($controller instanceof \App\Controller\Student\Placement\View) {
+        if ($controller instanceof \App\Controller\Placement\View) {
             $this->controller = $controller;
 
             $template = $this->controller->getTemplate();
             $placement = $this->controller->getPlacement();
 
-            $list = \Ca\Db\AssessmentMap::create()->findFiltered(
-                array('subjectId' => $placement->subjectId, 'publish' => true)
-            );
+            $list = \Ca\Db\AssessmentMap::create()->findFiltered([
+                //'subjectId' => $placement->getSubjectId(),
+                'courseId' => $placement->getSubject()->getCourseId(),
+                'publish' => true
+            ]);
             foreach ($list as $assessment) {
-                if (!$placement->getPlacementType() || !$placement->getPlacementType()->enableReport) continue;
+                if (!$placement->getPlacementType() || !$placement->getPlacementType()->isEnableReport()) continue;
                 if (!$assessment->isAvailable($placement)) continue;
-
                 $btn = null;
                 if ($assessment->isSelfAssessment()) {
                     /** @var \Ca\Db\Entry $entry */
@@ -46,7 +49,8 @@ class PlacementViewHandler implements Subscriber
                         'placementId' => $placement->getId()
                     ))->current();
                     if ($entry) {
-                        if ($entry->getStatus() == \Ca\Db\Entry::STATUS_PENDING || $entry->getStatus() == \Ca\Db\Entry::STATUS_AMEND) {
+                        if (($entry->getStatus() == \Ca\Db\Entry::STATUS_PENDING || $entry->getStatus() == \Ca\Db\Entry::STATUS_AMEND)
+                            && ($this->getAuthUser()->isStaff() || $this->getAuthUser()->isLearner())) {
                             $url = \Uni\Uri::createSubjectUrl('/ca/entryEdit.html')
                                 ->set('assessmentId', $assessment->getId())->set('placementId', $placement->getId());
                             $btn = \Tk\Ui\Link::createBtn($assessment->getName(), $url, $assessment->getIcon());
@@ -58,7 +62,7 @@ class PlacementViewHandler implements Subscriber
                             $btn->setAttr('title', 'View ' . $assessment->getName());
                         }
                     } else {
-                        if ($placement->getReport()) {
+                        if ($placement->getReport() && ($this->getAuthUser()->isStaff() || $this->getAuthUser()->isLearner())) {
                             $url = \Uni\Uri::createSubjectUrl('/ca/entryEdit.html')
                                 ->set('assessmentId', $assessment->getId())->set('placementId', $placement->getId());
                             $btn = \Tk\Ui\Link::createBtn($assessment->getName(), $url, $assessment->getIcon());

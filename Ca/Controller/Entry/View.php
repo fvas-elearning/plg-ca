@@ -4,6 +4,7 @@ namespace Ca\Controller\Entry;
 use App\Controller\AdminEditIface;
 use Dom\Template;
 use Tk\Request;
+use Tk\Str;
 
 /**
  *
@@ -58,7 +59,24 @@ class View extends AdminEditIface
      */
     public function doDefault(Request $request)
     {
-        $this->entry = \Ca\Db\EntryMap::create()->find($request->get('entryId'));
+        if ($request->get('placementId') && $request->get('assessmentId'))
+            $this->entry = \Ca\Db\EntryMap::create()->findFiltered(array(
+                'placementId' => $request->get('placementId'),
+                'assessmentId' => $request->get('assessmentId')
+            ))->current();
+
+        if ($request->get('entryId'))
+            $this->entry = \Ca\Db\EntryMap::create()->find($request->get('entryId'));
+
+        if (!$this->entry) {
+            throw new \Tk\Exception('No valid entry found!');
+        }
+        //vd($this->entry->getPlacement()->getUserId(), $this->entry->getStudentId(), $this->getAuthUser()->getId());
+        if ($this->getAuthUser()->isStudent() && $this->entry->getPlacement()->getUserId() != $this->getAuthUser()->getId()) {
+            \Tk\Alert::addError('You are not authorised to access this entry. PLease try another.');
+            $this->getBackUrl()->redirect();
+        }
+
 
         $this->setPageTitle('View ' . $this->getEntry()->getAssessment()->getName());
 
@@ -82,7 +100,8 @@ class View extends AdminEditIface
     }
 
     /**
-     * @return \Dom\Template
+     * @return Template
+     * @throws \Exception
      */
     public function show()
     {
@@ -102,7 +121,7 @@ class View extends AdminEditIface
         }
 
         if ($this->getEntry()->getAssessment()->getDescription()) {
-            $template->insertHtml('instructions', $this->getEntry()->getAssessment()->getDescription());
+            $template->insertHtml('instructions', Str::stripStyles($this->getEntry()->getAssessment()->getDescription()) );
             $template->setVisible('instructions');
         }
 

@@ -1,6 +1,6 @@
 {
-    "name": "ttek-plg/plg-ca",
-    "type": "ttek-plugin",
+    "name": "uom-plg/plg-ca",
+    "type": "uom-plugin",
     "description": "The University Of Melbourne - FVAS EMS Placement Compentency Assessment plugin.",
     "keywords":  [
         "tropotek",
@@ -20,6 +20,11 @@
     "autoload":  {
         "psr-0":  {
             "Ca\\": ""
+        }
+    },
+    "extra":  {
+        "branch-alias":  {
+            "dev-master": "3.2.x-dev"
         }
     },
     "require":  {

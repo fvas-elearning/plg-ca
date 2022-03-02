@@ -14,28 +14,84 @@ class StatusMailHandler implements Subscriber
 {
 
     /**
-     * @param \Uni\Event\StatusEvent $event
+     * @param \Bs\Event\StatusEvent $event
      * @throws \Exception
      */
-    public function onSendAllStatusMessages(\Uni\Event\StatusEvent $event)
+    public function onSendAllStatusMessages(\Bs\Event\StatusEvent $event)
     {
-        if (!$event->getStatus()->isNotify() || !$event->getStatus()->getCourse()->getCourseProfile()->isNotifications()) return;   // do not send messages
+        // do not send messages
+        $course = \Uni\Util\Status::getCourse($event->getStatus());
+        if (!$event->getStatus()->isNotify() || ($course && !$course->getCourseProfile()->isNotifications())) {
+            //\Tk\Log::debug('Skill::onSendAllStatusMessages: Status Notification Disabled');
+            return;
+        }
+        $subject = \Uni\Util\Status::getSubject($event->getStatus());
 
         /** @var \Tk\Mail\CurlyMessage $message */
         foreach ($event->getMessageList() as $message) {
+            if (!$message->get('placement::id')) continue;
+            /** @var \App\Db\Placement $placement */
+            $placement = \App\Db\PlacementMap::create()->find($message->get('placement::id'));
 
-            if ($message->get('placement::id')) {
-                /** @var \App\Db\Placement $placement */
-                $placement = \App\Db\PlacementMap::create()->find($message->get('placement::id'));
-                if ($placement) {
+            if ($placement) {
+                /** @var MailTemplate $mailTemplate */
+                $mailTemplate = $message->get('_mailTemplate');
+                /** @var \Ca\Db\Assessment $assessment */
+                $assessment = $message->get('_assessment');
+                if ($assessment) {      // when a specific entry message or reminder is sent then go in here
+                    $url = '';
+                    switch($assessment->getAssessorGroup()) {
+                        case \Ca\Db\Assessment::ASSESSOR_GROUP_STUDENT:     // Student URL
+                            $url = \Uni\Uri::createSubjectUrl('/ca/entryEdit.html', $placement->getSubject(), '/student')
+                                ->set('placementId', $placement->getId())
+                                ->set('assessmentId', $assessment->getId())->toString();
+                            break;
+                        case \Ca\Db\Assessment::ASSESSOR_GROUP_COMPANY:     // Public URL
+                            $url = \Uni\Uri::createInstitutionUrl('/assessment.html', $placement->getSubject()->getInstitution())
+                                ->set('h', $placement->getHash())
+                                ->set('assessmentId', $assessment->getId())->toString();
+                            break;
+                    }
+                    if($mailTemplate->getRecipient() == MailTemplate::RECIPIENT_MENTOR) {
+                        $url = \Uni\Uri::createSubjectUrl('/ca/entryView.html', $placement->getSubject(), '/staff')
+                            ->set('placementId', $placement->getId())
+                            ->set('assessmentId', $assessment->getId())->toString();
+                    }
+                    $linkHtml = sprintf('<a href="%s" title="%s">%s</a>', htmlentities($url),
+                        htmlentities($assessment->getName()), htmlentities($assessment->getName()));
+                    $linkText = sprintf('%s: %s', htmlentities($assessment->getName()), htmlentities($url));
 
+                    $message->set('assessment::linkHtml', $linkHtml);
+                    $message->set('assessment::linkText', $linkText);
+                    $message->set('assessment::name', $assessment->getName());
+
+                    // TODO: These should be deprecated where possible
+                    $message->set('ca::linkHtml', $linkHtml);
+                    $message->set('ca::linkText', $linkText);
+                } else {    // This would be used ??????
+
+                    $caLinkHtml = '';
+                    $caLinkText = '';
+                    $filter = array(
+                        'active' => true,
+                        'subjectId' => $message->get('placement::subjectId'),
+                        'assessorGroup' => \Ca\Db\Assessment::ASSESSOR_GROUP_COMPANY,
+                        'placementTypeId' => $placement->placementTypeId
+                    );
+                    $list = \Ca\Db\AssessmentMap::create()->findFiltered($filter);
+                    //vd($filter, $list->count());
                     /** @var \Ca\Db\Assessment $assessment */
-                    $assessment = $message->get('_assessment');
-                    if ($assessment) {      // when a specific entry message or reminder is sent then go in here
+                    foreach ($list as $assessment) {
+                        $key = $assessment->getNameKey();
+                        $avail = '';
+                        if (!$assessment->isAvailable($placement)) {
+                            $avail = ' [Currently Unavailable]';
+                        }
                         $url = '';
+
                         switch($assessment->getAssessorGroup()) {
                             case \Ca\Db\Assessment::ASSESSOR_GROUP_STUDENT:     // Student URL
-                                $url = \Uni\Uri::createSubjectUrl('/ca/editEntry.html', $placement->getSubject(), '/student')
+                                $url = \Uni\Uri::createSubjectUrl('/ca/entryEdit.html', $placement->getSubject(), '/student')
                                     ->set('placementId', $placement->getId())
                                     ->set('assessmentId', $assessment->getId())->toString();
                                 break;
@@ -45,69 +101,36 @@ class StatusMailHandler implements Subscriber
                                     ->set('assessmentId', $assessment->getId())->toString();
                                 break;
                         }
-                        $linkHtml = sprintf('<a href="%s" title="%s">%s</a>', htmlentities($url),
-                            htmlentities($assessment->getName()), htmlentities($assessment->getName()));
-                        $linkText = sprintf('%s: %s', htmlentities($assessment->getName()), htmlentities($url));
-
-                        $message->set('assessment::linkHtml', $linkHtml);
-                        $message->set('assessment::linkText', $linkText);
-                        $message->set('assessment::name', $assessment->getName());
-                    } else {    // This would be used for placement emails sent where there is no entry in the status
-
-                        $caLinkHtml = '';
-                        $caLinkText = '';
-                        $filter = array(
-                            'active' => true,
-                            'subjectId' => $message->get('placement::subjectId'),
-                            'assessorGroup' => \Ca\Db\Assessment::ASSESSOR_GROUP_COMPANY,
-                            'placementTypeId' => $placement->placementTypeId
-                        );
-                        $list = \Ca\Db\AssessmentMap::create()->findFiltered($filter);
-                        /** @var \Ca\Db\Assessment $assessment */
-                        foreach ($list as $assessment) {
-                            $key = $assessment->getNameKey();
-                            $avail = '';
-                            if (!$assessment->isAvailable($placement)) {
-                                $avail = ' [Currently Unavailable]';
-                            }
-                            $url = '';
-
-                            switch($assessment->getAssessorGroup()) {
-                                case \Ca\Db\Assessment::ASSESSOR_GROUP_STUDENT:     // Student URL
-                                    $url = \Uni\Uri::createSubjectUrl('/ca/editEntry.html', $placement->getSubject(), '/student')
-                                        ->set('placementId', $placement->getId())
-                                        ->set('assessmentId', $assessment->getId())->toString();
-                                    break;
-                                case \Ca\Db\Assessment::ASSESSOR_GROUP_COMPANY:     // Public URL
-                                    $url = \Uni\Uri::createInstitutionUrl('/assessment.html', $placement->getSubject()->getInstitution())
-                                        ->set('h', $placement->getHash())
-                                        ->set('assessmentId', $assessment->getId())->toString();
-                                    break;
-                            }
-                            $asLinkHtml = sprintf('<a href="%s" title="%s">%s</a>', htmlentities($url),
-                                htmlentities($assessment->getName()) . $avail, htmlentities($assessment->getName()) . $avail);
-                            $asLinkText = sprintf('%s: %s', htmlentities($assessment->getName()) . $avail, htmlentities($url));
-
-                            $message->set($key.'::linkHtml', $asLinkHtml);
-                            $message->set($key.'::linkText', $asLinkText);
-                            $message->set($key.'::name', $assessment->getName());
-
-                            $caLinkHtml .= sprintf('<a href="%s" title="%s">%s</a> | ', htmlentities($url),
-                                htmlentities($assessment->getName()) . $avail, htmlentities($assessment->getName()) . $avail);
-                            $caLinkText .= sprintf('%s: %s | ', htmlentities($assessment->getName()) . $avail, htmlentities($url));
+                        if($mailTemplate->getRecipient() == MailTemplate::RECIPIENT_MENTOR) {
+                            $url = \Uni\Uri::createSubjectUrl('/ca/entryView.html', $placement->getSubject(), '/staff')
+                                ->set('placementId', $placement->getId())
+                                ->set('assessmentId', $assessment->getId())->toString();
                         }
 
-                        $message->set('assessment::linkHtml', rtrim($caLinkHtml, ' | '));
-                        $message->set('assessment::linkText', rtrim($caLinkText, ' | '));
 
-                        // TODO: These should be deprecated where possible
-                        $message->set('ca::linkHtml', rtrim($caLinkHtml, ' | '));
-                        $message->set('ca::linkText', rtrim($caLinkText, ' | '));
+                        $asLinkHtml = sprintf('<a href="%s" title="%s">%s</a>', htmlentities($url),
+                            htmlentities($assessment->getName()) . $avail, htmlentities($assessment->getName()) . $avail);
+                        $asLinkText = sprintf('%s: %s', htmlentities($assessment->getName()) . $avail, htmlentities($url));
 
+                        $message->set($key.'::linkHtml', $asLinkHtml);
+                        $message->set($key.'::linkText', $asLinkText);
+                        $message->set($key.'::name', $assessment->getName());
+
+                        $caLinkHtml .= sprintf('<a href="%s" title="%s">%s</a> | ', htmlentities($url),
+                            htmlentities($assessment->getName()) . $avail, htmlentities($assessment->getName()) . $avail);
+                        $caLinkText .= sprintf('%s: %s | ', htmlentities($assessment->getName()) . $avail, htmlentities($url));
                     }
 
+                    $message->set('assessment::linkHtml', rtrim($caLinkHtml, ' | '));
+                    $message->set('assessment::linkText', rtrim($caLinkText, ' | '));
+                    // TODO: These should be deprecated where possible
+                    $message->set('ca::linkHtml', rtrim($caLinkHtml, ' | '));
+                    $message->set('ca::linkText', rtrim($caLinkText, ' | '));
+
                 }
+
             }
+
         }
     }
 
@@ -125,6 +148,7 @@ class StatusMailHandler implements Subscriber
         $list['{entry::assessor}'] = 'Assessor Name';
         $list['{entry::status}'] = 'approved';
         $list['{entry::notes}'] = 'Notes Text';
+        $list['{entry::attachPdf}'] = 'Attach Entry PDF to email';
 
         $list['{assessment::id}'] = 1;
         $list['{assessment::name}'] = 'Assessment Name';
@@ -174,7 +198,7 @@ class StatusMailHandler implements Subscriber
     public static function getSubscribedEvents()
     {
         return array(
-            \Uni\StatusEvents::STATUS_SEND_MESSAGES => array('onSendAllStatusMessages', 10),
+            \Bs\StatusEvents::STATUS_SEND_MESSAGES => array('onSendAllStatusMessages', 10),
             \App\AppEvents::MAIL_TEMPLATE_TAG_LIST => array('onTagList', 10)
         );
     }

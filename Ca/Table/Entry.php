@@ -52,7 +52,9 @@ class Entry extends \Uni\TableIface
         // Actions
         //$this->appendAction(\Tk\Table\Action\Link::createLink('New Entry', \Bs\Uri::createHomeUrl('/ca/entryEdit.html'), 'fa fa-plus'));
         //$this->appendAction(\Tk\Table\Action\ColumnSelect::create()->setUnselected(array('modified', 'created')));
-        $this->appendAction(\Tk\Table\Action\Delete::create());
+        if ($this->getAuthUser()->isCoordinator()) {
+            $this->appendAction(\Tk\Table\Action\Delete::create());
+        }
         $this->appendAction(\Tk\Table\Action\Csv::create());
 
         // load table

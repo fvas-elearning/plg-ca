@@ -4,6 +4,7 @@ namespace Ca\Form;
 use Tk\Form;
 use Tk\Form\Event;
 use Tk\Form\Field;
+use Tk\Str;
 
 /**
  * Example:
@@ -52,15 +53,24 @@ class Assessment extends \Uni\FormIface
             ->setCheckboxLabel('Display a checkbox on the Subject student assessment table when Entry marked approved');
 
         // TODO: Hide this when assessor group is 'student'
-        $this->appendField(new Field\Select('placementStatus[]', \App\Db\Placement::getStatusList()))
-            ->addCss('tk-dual-select')->setTabGroup($tab)
-            ->setNotes('Select the placement status values when assessments become available and can be submitted.');
+        //$list = \App\Db\Placement::getStatusList();
+        $list = array('Approved' => 'approved', 'Assessing' => 'assessing', 'Evaluating' => 'evaluating');
+        $this->appendField(new Field\CheckboxGroup('placementStatus[]', $list))
+            ->addCss('_tk-dual-select')->setTabGroup($tab)
+            ->setNotes('Select the placement status values when assessments become available and can be submitted by users.');
+
+//        $this->appendField(new Field\Select('placementStatus[]', $list))
+//            ->addCss('tk-dual-select')->setTabGroup($tab)
+//            ->setNotes('Select the placement status values when assessments become available and can be submitted by users.');
 
         $list = \App\Db\PlacementTypeMap::create()->findFiltered(array('courseId' => $this->getAssessment()->getCourseId()));
-
-        $ptiField = $this->appendField(new Field\Select('placementTypeId[]', $list))->setTabGroup($tab)
-            ->addCss('tk-dual-select')->setAttr('data-title', 'Placement Types')
+        $ptiField = $this->appendField(new Field\CheckboxGroup('placementTypeId[]', $list))
+            ->addCss('_tk-dual-select')->setTabGroup($tab)
             ->setNotes('Enable this assessment for the selected placement types.');
+
+//        $ptiField = $this->appendField(new Field\Select('placementTypeId[]', $list))->setTabGroup($tab)
+//            ->addCss('tk-dual-select')->setAttr('data-title', 'Placement Types')
+//            ->setNotes('Enable this assessment for the selected placement types.');
 
         $list = \Ca\Db\AssessmentMap::create()->findPlacementTypes($this->getAssessment()->getId());
         $ptiField->setValue($list);
@@ -120,6 +130,8 @@ class Assessment extends \Uni\FormIface
         if ($form->hasErrors()) {
             return;
         }
+
+        $this->getAssessment()->setDescription(Str::stripStyles($this->getAssessment()->getDescription()));
 
         $isNew = (bool)$this->getAssessment()->getId();
         $this->getAssessment()->save();

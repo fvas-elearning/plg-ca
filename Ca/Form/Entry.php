@@ -91,6 +91,16 @@ class Entry extends \Uni\FormIface
             if ($val) {
                 $field->setValue($val->value);
             }
+//            else if (!$this->getEntry()->getId() && $item->getScaleId() == 7) {
+//            //} else if ($item->getScaleId() == 7) {    // Not sure if we should do it every time there is no value
+//                if (class_exists('\\Rs\\Calculator')) {
+//                    $placement = $this->getEntry()->getPlacement();
+//                    $arr = ['small' => 1, 'prod' => 2, 'equine' => 3, 'other' => 4];
+//                    /** @var \Rs\Db\Rule $rule */
+//                    $rule = \Rs\Calculator::findPlacementRuleList($placement)->current();
+//                    $field->setValue($arr[$rule->getLabel()]);
+//                }
+//            }
         }
 
         if ($this->isPublic()) {
@@ -154,14 +164,16 @@ JS;
 
         if ($this->getEntry()->getId() < 0) {
             \Tk\Alert::addInfo('This form was successfully submitted and validated.<br/>However no data was saved as this is only a preview form. ;-)');
-            //$event->setRedirect(\Tk\Uri::create());
             return;
         }
 
         $isNew = (bool)$this->getEntry()->getId();
 
-        if ($this->getAuthUser() && $this->getAuthUser()->isStudent() && $this->getEntry()->getAssessment()->isSelfAssessment() && $this->getEntry()->getStatus() == \Ca\Db\Entry::STATUS_AMEND)
-            $this->getEntry()->status = \Ca\Db\Entry::STATUS_PENDING;
+        if ($this->getAuthUser() && $this->getAuthUser()->isStudent() &&
+            $this->getEntry()->getAssessment()->isSelfAssessment() && $this->getEntry()->hasStatus(\Ca\Db\Entry::STATUS_AMEND)) {
+            $this->getEntry()->setStatus(\Ca\Db\Entry::STATUS_PENDING);
+        }
+        $this->getEntry()->setStatusNotify(true);
         $this->getEntry()->save();
 
         // Save Item values
@@ -171,22 +183,19 @@ JS;
             \Ca\Db\EntryMap::create()->saveValue($this->getEntry()->getVolatileId(), $id, $val);
         }
 
-        // Create status if changed and trigger notifications
-        if (!$this->isPublic() && $form->getField('status') instanceof \Uni\Form\Field\StatusSelect) {
-            \Uni\Db\Status::createFromStatusSelect($this->getEntry(), $form->getField('status'));
-        } else {
-            \Uni\Db\Status::createFromTrait($this->getEntry());
-        }
-
-        \Tk\Alert::addSuccess('Record saved!');
-
         $event->setRedirect($this->getBackUrl());
         if ($form->getTriggeredEvent()->getName() == 'save') {
+            \Tk\Alert::addSuccess('Record saved!');
             $event->setRedirect(\Tk\Uri::create()->set('entryId', $this->getEntry()->getId()));
-        }
-        if ($form->getTriggeredEvent()->getName() == 'update' && $this->getAuthUser()->isStaff()) {
+        } else if ($form->getTriggeredEvent()->getName() == 'update' && $this->getAuthUser()->isStaff()) {
+            \Tk\Alert::addSuccess('Record saved!');
             $url = \Uni\Uri::createSubjectUrl('/placementEdit.html')->set('placementId', $this->getEntry()->getPlacementId());
             $event->setRedirect($url);
+        }
+
+        if (!$this->getAuthUser() || $this->getAuthUser()->isGuest()) {
+            \Tk\Alert::addSuccess('Thank you! Student placement feedback submitted successfully.');
+            $event->setRedirect(\Tk\Uri::create('/index.html'));
         }
 
     }

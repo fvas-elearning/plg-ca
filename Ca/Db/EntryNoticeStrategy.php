@@ -2,7 +2,7 @@
 namespace Ca\Db;
 
 use App\Db\Notice;
-use App\Db\Status;
+use Bs\Db\Status;
 
 /**
  * @author Michael Mifsud <info@tropotek.com>

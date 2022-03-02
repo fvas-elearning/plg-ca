@@ -3,7 +3,10 @@ namespace Ca\Controller\Entry;
 
 use App\Controller\AdminEditIface;
 use Dom\Template;
+use Tk\Crumbs;
 use Tk\Request;
+use Tk\Str;
+use Tk\Ui\ButtonDropdown;
 
 /**
  *
@@ -22,7 +25,7 @@ class Edit extends AdminEditIface
     protected $entry = null;
 
     /**
-     * @var \Uni\Table\Status
+     * @var \Bs\Table\Status
      */
     protected $statusTable = null;
 
@@ -127,8 +130,8 @@ class Edit extends AdminEditIface
                     $this->entry = $e;
                 } else {
                     $this->getEntry()->setPlacementId($placement->getId());
-                    $this->getEntry()->setStudentId($this->getEntry()->getPlacement()->getUnits());
-                    $this->getEntry()->setSubjectId($this->getEntry()->getPlacement()->getSubjectId());
+                    $this->getEntry()->setStudentId($placement->getUserId());
+                    $this->getEntry()->setSubjectId($placement->getSubjectId());
                     if (!$this->getEntry()->getAssessment()) {
                         $this->errors[] = 'Invalid Assessment Found! Please contact the subject coordinator.';
                         return;
@@ -146,30 +149,7 @@ class Edit extends AdminEditIface
                 if ($e) $this->entry = $e;
             }
         }
-            // TODO: Do not think this is needed, at any rate use the placement subjectId if needed!!!
-//            if (!$this->getEntry()->getSubjectId() && $this->getSubject()) {
-//                $this->getEntry()->setSubjectId($this->getSubject()->getId());
-//            }
 
-
-        // Staff view student self assessment
-//        if ($request->get('assessmentId') && $request->get('studentId') && $this->getUser()->isStaff()) {
-//            $e = \Ca\Db\EntryMap::create()->findFiltered(array(
-//                    'assessmentId' => $request->get('assessmentId'),
-//                    'studentId' => $request->get('studentId'))
-//            )->current();
-//            if ($e) $this->entry = $e;
-//        }
-
-        // Assumed to be student self assessment form
-//        if (!$request->has('studentId') && !$request->has('subjectId') && $this->getUser() && $this->getUser()->isStudent()) {
-//            $e = \Ca\Db\EntryMap::create()->findFiltered(array(
-//                    'assessmentId' => $this->getEntry()->getAssessmentId(),
-//                    'subjectId' => $this->getEntry()->getSubjectId(),
-//                    'studentId' => $this->getEntry()->getStudentId())
-//            )->current();
-//            if ($e) $this->entry = $e;
-//        }
 
         if ($this->isPublic()) {
             if ($this->getEntry()->hasStatus(array(\Ca\Db\Entry::STATUS_APPROVED, \Ca\Db\Entry::STATUS_NOT_APPROVED))) {
@@ -184,12 +164,13 @@ class Edit extends AdminEditIface
             if ($this->getAuthUser()->isStudent()) {
                 if ($this->getEntry()->getId() && $this->getEntry()->getPlacement()) {
                     if (!$this->getEntry()->getAssessment()->canWriteEntry($this->getEntry()->getPlacement(), $this->getAuthUser())) {
+
                         if (!$this->getEntry()->getAssessment()->canReadEntry($this->getEntry()->getPlacement(), $this->getAuthUser())) {
                             \Tk\Alert::addError('You do not have access to this file, please contact your coordinator.');
                             \Uni\Uri::createSubjectUrl('/index.html')->redirect();
                         }
                         if ($this->getEntry()->getId()) {
-                            \Uni\Uri::createSubjectUrl('/entryView.html')->set('entryId', $this->getEntry()->getId())->redirect();
+                            \Uni\Uri::createSubjectUrl('/ca/entryView.html')->set('entryId', $this->getEntry()->getId())->redirect();
                         }
                     }
                 }
@@ -216,6 +197,10 @@ class Edit extends AdminEditIface
 
         // ---------------------- End Entry Setup -------------------
 
+        if ($request->has('p')) {
+            return $this->doPdf($request);
+        }
+
         $this->setPageTitle($this->getEntry()->getAssessment()->getName());
 
         $this->setForm(\Ca\Form\Entry::create($this->isPublic())->setModel($this->getEntry()));
@@ -229,13 +214,28 @@ class Edit extends AdminEditIface
         $this->getForm()->execute();
 
         if ($this->getAuthUser() && $this->getAuthUser()->isStaff() && $this->getEntry()->getId()) {
-            $this->statusTable = \Uni\Table\Status::create(\App\Config::getInstance()->getUrlName().'-status')->init();
+            $this->statusTable = \Bs\Table\Status::create(\App\Config::getInstance()->getUrlName().'-status')->init();
             $filter = array(
                 'model' => $this->getEntry(),
                 'subjectId' => $this->getEntry()->getSubjectId()
             );
             $this->statusTable->setList($this->statusTable->findList($filter, $this->statusTable->getTool('created DESC')));
         }
+    }
+
+    /**
+     * @param Request $request
+     * @return \Dom\Renderer\Renderer|Template|null|void
+     * @throws \Exception
+     */
+    public function doPdf(Request $request)
+    {
+        $watermark = '';
+        $ren = \Ca\Util\Pdf\Entry::create($this->entry, $watermark);
+        //$ren->download();
+        if (!$request->has('isHtml'))
+            $ren->output();     // comment this to see html version
+        return $ren->show();
     }
 
     /**
@@ -250,6 +250,11 @@ class Edit extends AdminEditIface
 //            $this->getActionPanel()->append(\Tk\Ui\Link::createBtn('PDF',
 //                \Uni\Uri::createSubjectUrl('/ca/entryView.html')->set('entryId', $this->getEntry()->getId())->set('p', 'p'), 'fa fa-file-pdf-o')
 //                ->setAttr('target', '_blank'));
+            $links = [
+                \Tk\Ui\Link::create('PDF View', \Uni\Uri::create()->set('p')->set('entryId', $this->getEntry()->getId())->set(Crumbs::CRUMB_IGNORE), 'fa fa-file-pdf-o')->setAttr('target', '_blank')->setAttr('title', 'Download/View Entry Details'),
+                \Tk\Ui\Link::create('HTML View', \Uni\Uri::create()->set('p')->set('entryId', $this->getEntry()->getId())->set('isHtml')->set(Crumbs::CRUMB_IGNORE), 'fa fa-eye')->setAttr('target', '_blank')->setAttr('title', 'Download/View Entry Details')
+            ];
+            $this->getActionPanel()->append(ButtonDropdown::createButtonDropdown('Print View', 'fa fa-print', $links))->setAttr('title', 'Download/View Case Details');
         }
     }
 
@@ -302,7 +307,7 @@ class Edit extends AdminEditIface
         }
         if ($this->getEntry()->getAssessment()->getDescription()) {
 
-            $template->insertHtml('instructions', $this->getEntry()->getAssessment()->getDescription());
+            $template->insertHtml('instructions', Str::stripStyles($this->getEntry()->getAssessment()->getDescription()));
             $template->setVisible('instructions');
         }
 
@@ -339,12 +344,17 @@ HTML;
 <div class="content EntryEdit">
   <div class="container">
     <div class="layout layout-stack-sm layout-main-left">
+    
       <div class="layout-main" choice="available">
         <div class="ca-description" var="instructions"></div>
         <div var="panel"></div>
       </div>
+      
       <div class="layout-main" choice="not-available">
-        <p>Please <a href="/contact.html?subjectId=0" var="contact">contact</a> the subject coordinator as this resource is no longer available.</p>
+        <p>
+          Please <a href="/contact.html?subjectId=0" var="contact">contact</a> the subject 
+          coordinator as this resource is no longer available.
+        </p>
       </div>
     </div>
   </div>

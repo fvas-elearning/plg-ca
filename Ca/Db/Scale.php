@@ -212,6 +212,15 @@ class Scale extends \Tk\Db\Map\Model implements \Tk\ValidInterface
     }
 
     /**
+     * @return Option[]|\Tk\Db\Map\ArrayObject
+     * @throws \Exception
+     */
+    public function getOptions()
+    {
+        return OptionMap::create()->findFiltered(['scaleId' => $this->getVolatileId()]);
+    }
+
+    /**
      * @return array
      */
     public function validate()
@@ -227,7 +236,7 @@ class Scale extends \Tk\Db\Map\Model implements \Tk\ValidInterface
             $errors['type'] = 'Invalid value: type';
         }
 
-        if ($this->getType() == self::TYPE_CHOICE && $this->getMultiple() && !$this->getCalcType()) {
+        if ($this->getType() == self::TYPE_CHOICE && $this->isMultiple() && !$this->getCalcType()) {
             $errors['calcType'] = 'Invalid value: calcType';
         }
 

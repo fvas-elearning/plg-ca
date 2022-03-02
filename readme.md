@@ -1,6 +1,6 @@
 # CA Plugin
 
-__Project:__ [ttek-plg/plg-ca](http://packagist.org/packages/ttek-plg/plg-ca)  
+__Project:__ [uom-plg/plg-ca](http://packagist.org/packages/uom-plg/plg-ca)  
 __Web:__ <http://www.tropotek.com/>  
 __Authors:__ Michael Mifsud <http://www.tropotek.com/>  
   
@@ -15,24 +15,23 @@ Competency Assessment Tool plugin. Send requests to clients to complete a form a
 
 ## Installation
 
-Available on Packagist ([ttek-plg/plg-ca](http://packagist.org/packages/ttek-plg/plg-ca))
+Available on Packagist ([uom-plg/plg-ca](http://packagist.org/packages/uom-plg/plg-ca))
 and as such installable via [Composer](http://getcomposer.org/).
 
 ```bash
-# composer require ttek-plg/plg-ca
+# composer require uom-plg/plg-ca
 ```
 
 Or add the following to your composer.json file:
 
 ```json
 {
-  "ttek-plg/plg-ca": "~1.0"
+  "uom-plg/plg-ca": "~1.0"
 }
 ```
 
 If you do not use Composer, you can grab the code from GitHub, and use any
-PSR-0 compatible autoloader (e.g. the [plg-ca](https://github.com/tropotek/plg-ca))
-to load the classes.
+PSR-0 compatible autoloader to load the classes.
 
 ## Introduction
 

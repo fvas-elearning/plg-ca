@@ -44,7 +44,7 @@ class Manager extends AdminManagerIface
      */
     public function initActionPanel()
     {
-        if ($this->getAuthUser()->hasPermission(\Uni\Db\Permission::TYPE_COORDINATOR)) {
+        if ($this->getAuthUser()->isCoordinator()) {
             $this->getActionPanel()->append(\Tk\Ui\Link::createBtn('New Assessment',
                 $this->getTable()->getEditUrl()->set('courseId', $this->getCourseId()), 'fa fa-book fa-add-action'));
 
@@ -54,7 +54,7 @@ class Manager extends AdminManagerIface
             $this->getActionPanel()->append(\Tk\Ui\Link::createBtn('Competencies',
                 \Uni\Uri::createHomeUrl('/ca/competencyManager.html')->set('courseId', $this->getCourseId()), 'fa fa-leaf'));
         }
-        if ($this->getAuthUser()->hasPermission(\Uni\Db\Permission::TYPE_ADMIN)) {
+        if ($this->getAuthUser()->isAdmin()) {
             $this->getActionPanel()->append(\Tk\Ui\Link::createBtn('Scales',
                 \Uni\Uri::createHomeUrl('/ca/scaleManager.html')->set('courseId', $this->getCourseId()), 'fa fa-balance-scale'));
         }

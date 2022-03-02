@@ -45,60 +45,6 @@ class SubjectDashboardHandler implements Subscriber
         $this->controller = $event->get('controller');
         $subject = $this->controller->getConfig()->getSubject();
 
-        // STAFF Subject Dashboard
-//        if ($this->controller instanceof \App\Controller\Staff\SubjectDashboard) {
-//            $userList = $this->controller->getSubjectUserList();
-//            $userList->setOnShowUser(function (\Dom\Template $template, \App\Db\User $user) use ($subject) {
-//                $list = \Skill\Db\CollectionMap::create()->findFiltered(
-//                    array('subjectId' => $subject->getId(), 'gradable' => true, 'requirePlacement' => true));
-//                /** @var \Skill\Db\Collection $assessment */
-//                foreach ($list as $assessment) {
-//                    if (!$assessment->isAvailable()) continue;
-//                    // if user has a placement of at least one of the types and status
-//                    $entryList = \Skill\Db\EntryMap::create()->findFiltered(array(
-//                        'userId' => $user->getId(),
-//                        'collectionId' => $assessment->getId(),
-//                        'status' => \Skill\Db\Entry::STATUS_APPROVED
-//                    ));
-//                    if (!$entryList->count()) continue;
-//
-//                    $btn = \Tk\Ui\Button::create($assessment->name . ' Results', \Uni\Uri::createSubjectUrl('/entryResults.html')
-//                        ->set('userId', $user->getId())->set('collectionId', $assessment->getId()), $assessment->icon);
-//                    $btn->addCss('btn-primary btn-xs');
-//                    $btn->setAttr('title', 'View Student ' . $assessment->name . ' Results');
-//                    $template->prependTemplate('utr-row2', $btn->show());
-//
-//                }
-//
-//                $list = \Skill\Db\CollectionMap::create()->findFiltered(array('subjectId' => $subject->getId(), 'requirePlacement' => false));
-//                /** @var \Skill\Db\Collection $assessment */
-//                foreach ($list as $assessment) {
-//                    if (!$assessment->isAvailable()) continue;
-//                    $btn = \Tk\Ui\Button::create($assessment->name, \Uni\Uri::createSubjectUrl('/entryEdit.html')
-//                        ->set('userId', $user->getId())->set('collectionId', $assessment->getId()), $assessment->icon);
-//                    $entry = \Skill\Db\EntryMap::create()->findFiltered(
-//                        array(
-//                            'collectionId' => $assessment->getId(),
-//                            'subjectId' => $subject->getId(),
-//                            'userId' => $user->getId(),
-//                            'placementId' => 0
-//                        )
-//                    )->current();
-//
-//                    if ($entry) {
-//                        $btn->addCss('btn-primary btn-xs');
-//                        $btn->setAttr('title', 'View Student ' . $assessment->name);
-//                    } else {
-//                        continue;
-//                    }
-//
-//                    $template->prependTemplate('utr-row2', $btn->show());
-//                }
-//
-//            });
-//
-//        }
-
         // STUDENT Subject Dashboard
         if ($this->controller instanceof \App\Controller\Student\SubjectDashboard) {
             $placementList = $this->controller->getPlacementList();

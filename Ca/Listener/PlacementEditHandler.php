@@ -1,6 +1,7 @@
 <?php
 namespace Ca\Listener;
 
+use Tk\ConfigTrait;
 use Tk\Event\Event;
 use Tk\Event\Subscriber;
 
@@ -11,6 +12,7 @@ use Tk\Event\Subscriber;
  */
 class PlacementEditHandler implements Subscriber
 {
+    use ConfigTrait;
 
     /**
      * @var \App\Db\Subject
@@ -64,10 +66,11 @@ class PlacementEditHandler implements Subscriber
 
             $this->list = \Ca\Db\AssessmentMap::create()->findFiltered(array(
                 'subjectId' => $this->subject->getId(),
-                'placementStatus' => $placement->status,
+                //'placementStatus' => $placement->status,
                 'assessorGroup' => \Ca\Db\Assessment::ASSESSOR_GROUP_COMPANY,
                 'placementTypeId' => $placement->placementTypeId
             ));
+
 
             if ($placement->getId()) {
                 /** @var \Ca\Db\Assessment $assessment */
@@ -75,7 +78,6 @@ class PlacementEditHandler implements Subscriber
                     $url = \Uni\Uri::createInstitutionUrl('/assessment.html', $placement->getSubject()->getInstitution())
                         ->set('h', $placement->getHash())
                         ->set('assessmentId', $assessment->getId());
-
                     $form->appendField(new \App\Form\Field\InputLink('assessment-' . $assessment->getId()))
                         ->setTabGroup('Details')->setReadonly()->setLabel($assessment->getName())
                         ->setFieldset('Public Assessment Url`s')->setValue($url->toString())
@@ -106,7 +108,6 @@ class PlacementEditHandler implements Subscriber
 
             $this->list = \Ca\Db\AssessmentMap::create()->findFiltered(array(
                 'subjectId' => $this->subject->getId(),
-                'placementStatus' => $placement->status,
                 'placementTypeId' => $placement->placementTypeId
             ));
 

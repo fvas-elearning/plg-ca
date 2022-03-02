@@ -66,7 +66,9 @@ class Assessment extends \Uni\TableIface
         // Actions
         //$this->appendAction(\Tk\Table\Action\Link::create('New Assessment', 'fa fa-plus', \Bs\Uri::createHomeUrl('/ca/assessmentEdit.html')));
         //$this->appendAction(\Tk\Table\Action\ColumnSelect::create()->setUnselected(array('modified', 'created')));
-        $this->appendAction(\Tk\Table\Action\Delete::create());
+        if ($this->getAuthUser()->isCoordinator()) {
+            $this->appendAction(\Tk\Table\Action\Delete::create());
+        }
         $this->appendAction(\Tk\Table\Action\Csv::create());
 
         // load table
